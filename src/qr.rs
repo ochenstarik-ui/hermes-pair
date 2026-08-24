@@ -37,7 +37,11 @@ pub fn render_terminal_qr(data: &str) -> Result<String, QrError> {
     // Dark modules: "██", Light modules: "  "
     for y in 0..total_size {
         for x in 0..total_size {
-            let is_dark = if x >= quiet_zone && x < quiet_zone + width && y >= quiet_zone && y < quiet_zone + width {
+            let is_dark = if x >= quiet_zone
+                && x < quiet_zone + width
+                && y >= quiet_zone
+                && y < quiet_zone + width
+            {
                 let qx = x - quiet_zone;
                 let qy = y - quiet_zone;
                 colors[qy * width + qx] == Color::Dark
@@ -74,7 +78,11 @@ pub fn render_egui_image(data: &str, scale: usize) -> Result<ColorImage, QrError
     for my in 0..total_modules {
         for _sy in 0..scale {
             for mx in 0..total_modules {
-                let is_dark = if mx >= quiet_zone && mx < quiet_zone + width && my >= quiet_zone && my < quiet_zone + width {
+                let is_dark = if mx >= quiet_zone
+                    && mx < quiet_zone + width
+                    && my >= quiet_zone
+                    && my < quiet_zone + width
+                {
                     let qx = mx - quiet_zone;
                     let qy = my - quiet_zone;
                     colors[qy * width + qx] == Color::Dark

@@ -25,18 +25,32 @@ pub enum PairingError {
 impl fmt::Display for PairingError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            PairingError::InvalidUriScheme(s) => write!(f, "Invalid URI scheme '{}', expected 'hermes'", s),
+            PairingError::InvalidUriScheme(s) => {
+                write!(f, "Invalid URI scheme '{}', expected 'hermes'", s)
+            }
             PairingError::InvalidUriFormat(s) => write!(f, "Invalid pairing URI format: {}", s),
-            PairingError::MissingDataParameter => write!(f, "Missing 'data' query parameter in pairing URI"),
-            PairingError::Base64DecodeError(e) => write!(f, "Failed to decode Base64URL payload: {}", e),
+            PairingError::MissingDataParameter => {
+                write!(f, "Missing 'data' query parameter in pairing URI")
+            }
+            PairingError::Base64DecodeError(e) => {
+                write!(f, "Failed to decode Base64URL payload: {}", e)
+            }
             PairingError::JsonDecodeError(e) => write!(f, "Failed to parse JSON payload: {}", e),
-            PairingError::UnsupportedVersion(v) => write!(f, "Unsupported payload version {}, expected 1", v),
-            PairingError::InvalidPayloadType(t) => write!(f, "Invalid payload type '{}', expected 'hermes-pair'", t),
+            PairingError::UnsupportedVersion(v) => {
+                write!(f, "Unsupported payload version {}, expected 1", v)
+            }
+            PairingError::InvalidPayloadType(t) => {
+                write!(f, "Invalid payload type '{}', expected 'hermes-pair'", t)
+            }
             PairingError::InvalidHostId(id) => write!(f, "Invalid host UUID: '{}'", id),
             PairingError::EmptyHost => write!(f, "Host address cannot be empty"),
             PairingError::InvalidPort(p) => write!(f, "Invalid port number: {}", p),
             PairingError::PayloadExpired { expires_at, now } => {
-                write!(f, "Pairing payload expired at timestamp {} (current time: {})", expires_at, now)
+                write!(
+                    f,
+                    "Pairing payload expired at timestamp {} (current time: {})",
+                    expires_at, now
+                )
             }
         }
     }
@@ -83,12 +97,16 @@ pub fn create_pairing_payload(
 }
 
 pub fn encode_pairing_uri(payload: &PairingPayloadV1) -> String {
-    let json = serde_json::to_string(payload).expect("Serialization of PairingPayloadV1 should never fail");
+    let json = serde_json::to_string(payload)
+        .expect("Serialization of PairingPayloadV1 should never fail");
     let encoded = URL_SAFE_NO_PAD.encode(json.as_bytes());
     format!("hermes://pair?data={}", encoded)
 }
 
-pub fn decode_pairing_uri_at_time(uri: &str, current_time: u64) -> Result<PairingPayloadV1, PairingError> {
+pub fn decode_pairing_uri_at_time(
+    uri: &str,
+    current_time: u64,
+) -> Result<PairingPayloadV1, PairingError> {
     let data_str = if let Ok(url) = Url::parse(uri) {
         if url.scheme() != "hermes" {
             return Err(PairingError::InvalidUriScheme(url.scheme().to_string()));
@@ -107,7 +125,10 @@ pub fn decode_pairing_uri_at_time(uri: &str, current_time: u64) -> Result<Pairin
         if !uri.starts_with("hermes://") && !uri.starts_with("hermes:") {
             return Err(PairingError::InvalidUriScheme("unknown".to_string()));
         }
-        let query_part = uri.split_once('?').map(|x| x.1).ok_or(PairingError::MissingDataParameter)?;
+        let query_part = uri
+            .split_once('?')
+            .map(|x| x.1)
+            .ok_or(PairingError::MissingDataParameter)?;
         let mut found = None;
         for pair in query_part.split('&') {
             if let Some((k, v)) = pair.split_once('=') {

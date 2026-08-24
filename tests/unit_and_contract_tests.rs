@@ -28,7 +28,8 @@ fn test_config_persistence() {
     assert!(Uuid::parse_str(&config1.host_id).is_ok());
 
     // Second load -> loads existing config and keeps same host_id
-    let config2 = load_or_create_config_from_path(&config_path).expect("Should load existing config");
+    let config2 =
+        load_or_create_config_from_path(&config_path).expect("Should load existing config");
     assert_eq!(config1.host_id, config2.host_id);
 
     // Clean up
@@ -51,13 +52,17 @@ fn test_pairing_payload_serde() {
     };
 
     let json = serde_json::to_string(&payload).expect("Serialization failed");
-    let deserialized: PairingPayloadV1 = serde_json::from_str(&json).expect("Deserialization failed");
+    let deserialized: PairingPayloadV1 =
+        serde_json::from_str(&json).expect("Deserialization failed");
     assert_eq!(payload, deserialized);
 
     // Verify Base64URL round-trip
     let b64 = URL_SAFE_NO_PAD.encode(json.as_bytes());
-    let decoded_bytes = URL_SAFE_NO_PAD.decode(b64.as_bytes()).expect("B64 decode failed");
-    let from_b64: PairingPayloadV1 = serde_json::from_slice(&decoded_bytes).expect("JSON from b64 failed");
+    let decoded_bytes = URL_SAFE_NO_PAD
+        .decode(b64.as_bytes())
+        .expect("B64 decode failed");
+    let from_b64: PairingPayloadV1 =
+        serde_json::from_slice(&decoded_bytes).expect("JSON from b64 failed");
     assert_eq!(payload, from_b64);
 }
 
@@ -203,8 +208,12 @@ fn test_network_interface_filtering() {
     let sorted = filter_and_sort_interfaces(test_interfaces);
 
     // Loopback and link-local must be eliminated
-    assert!(!sorted.iter().any(|i| i.is_loopback || i.ip == Ipv4Addr::new(127, 0, 0, 1)));
-    assert!(!sorted.iter().any(|i| i.ip == Ipv4Addr::new(169, 254, 10, 20)));
+    assert!(!sorted
+        .iter()
+        .any(|i| i.is_loopback || i.ip == Ipv4Addr::new(127, 0, 0, 1)));
+    assert!(!sorted
+        .iter()
+        .any(|i| i.ip == Ipv4Addr::new(169, 254, 10, 20)));
 
     // Order: Physical LAN (eth0 192.168.1.10) -> Tailscale (100.80.5.6) -> Virtual LAN (docker0 172.17.0.1)
     assert_eq!(sorted.len(), 3);
@@ -215,7 +224,9 @@ fn test_network_interface_filtering() {
 
 #[tokio::test]
 async fn test_mock_hermes_probe() {
-    let listener = TcpListener::bind("127.0.0.1:0").await.expect("Failed to bind mock listener");
+    let listener = TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("Failed to bind mock listener");
     let port = listener.local_addr().unwrap().port();
 
     let server_task = tokio::spawn(async move {
@@ -245,11 +256,17 @@ async fn test_mock_hermes_probe() {
     let base_url = format!("http://127.0.0.1:{}", port);
     let status_res = client.fetch_status(&base_url).await;
 
-    assert!(status_res.is_ok(), "Probe should succeed against mock server");
+    assert!(
+        status_res.is_ok(),
+        "Probe should succeed against mock server"
+    );
     let status = status_res.unwrap();
     assert_eq!(status.status, "running");
     assert!(status.auth_required);
-    assert_eq!(status.auth_providers, vec!["bearer".to_string(), "oauth2".to_string()]);
+    assert_eq!(
+        status.auth_providers,
+        vec!["bearer".to_string(), "oauth2".to_string()]
+    );
     assert_eq!(status.auth_flows, vec!["token".to_string()]);
     assert_eq!(status.version, Some("1.2.0".to_string()));
 

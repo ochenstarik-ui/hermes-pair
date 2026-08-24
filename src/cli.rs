@@ -79,9 +79,10 @@ pub fn resolve_selected_ip(
         }
 
         let lower = target.to_lowercase();
-        if let Some(matched) = interfaces.iter().find(|i| {
-            i.name.to_lowercase().contains(&lower) || i.ip.to_string() == target
-        }) {
+        if let Some(matched) = interfaces
+            .iter()
+            .find(|i| i.name.to_lowercase().contains(&lower) || i.ip.to_string() == target)
+        {
             return (matched.name.clone(), matched.ip);
         }
     }
@@ -134,8 +135,13 @@ pub async fn run_once(
             println!("Hermes: Running (v{}, Auth: {})", ver, auth);
         }
         ProbeState::LoopbackOnly { lan_error, .. } => {
-            println!("Hermes: Running locally (127.0.0.1), but LAN unreachable: {}", lan_error);
-            println!("⚠️  Warning: Hermes is bound to loopback only. Start Hermes with --host 0.0.0.0");
+            println!(
+                "Hermes: Running locally (127.0.0.1), but LAN unreachable: {}",
+                lan_error
+            );
+            println!(
+                "⚠️  Warning: Hermes is bound to loopback only. Start Hermes with --host 0.0.0.0"
+            );
         }
         ProbeState::Offline(err) => {
             println!("Hermes: Offline ({})", err);
@@ -221,8 +227,14 @@ pub async fn run_terminal_loop(
                 println!("Hermes: Running (v{}, Auth: {})", ver, auth);
             }
             ProbeState::LoopbackOnly { lan_error, .. } => {
-                println!("Hermes: Loopback Only (127.0.0.1) [LAN Error: {}]", lan_error);
-                println!("⚠️  Run Hermes with: hermes serve --host 0.0.0.0 --port {}", port);
+                println!(
+                    "Hermes: Loopback Only (127.0.0.1) [LAN Error: {}]",
+                    lan_error
+                );
+                println!(
+                    "⚠️  Run Hermes with: hermes serve --host 0.0.0.0 --port {}",
+                    port
+                );
             }
             ProbeState::Offline(err) => {
                 println!("Hermes: Offline ({})", err);
@@ -237,7 +249,10 @@ pub async fn run_terminal_loop(
         };
 
         println!("Host: {}", current_payload.name);
-        println!("Address: http://{}:{}", current_payload.host, current_payload.port);
+        println!(
+            "Address: http://{}:{}",
+            current_payload.host, current_payload.port
+        );
         println!("Host ID: {}", short_id);
         println!("Expires in: {:02}:{:02}", remaining / 60, remaining % 60);
         println!("\n{}", qr_rendered);

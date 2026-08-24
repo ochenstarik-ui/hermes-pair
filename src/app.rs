@@ -51,9 +51,10 @@ impl HermesPairApp {
         let mut selected_iface_index = 0;
         if let Some(ref target) = explicit_interface {
             let lower = target.to_lowercase();
-            if let Some(idx) = interfaces.iter().position(|i| {
-                i.name.to_lowercase().contains(&lower) || i.ip.to_string() == *target
-            }) {
+            if let Some(idx) = interfaces
+                .iter()
+                .position(|i| i.name.to_lowercase().contains(&lower) || i.ip.to_string() == *target)
+            {
                 selected_iface_index = idx;
             }
         }

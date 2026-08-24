@@ -26,7 +26,9 @@ pub fn get_config_path() -> PathBuf {
     #[cfg(target_os = "windows")]
     {
         if let Ok(appdata) = std::env::var("APPDATA") {
-            return PathBuf::from(appdata).join("HermesPair").join("config.json");
+            return PathBuf::from(appdata)
+                .join("HermesPair")
+                .join("config.json");
         }
         if let Some(config_dir) = dirs::config_dir() {
             return config_dir.join("HermesPair").join("config.json");
@@ -43,7 +45,10 @@ pub fn get_config_path() -> PathBuf {
             return config_dir.join("hermes-pair").join("config.json");
         }
         if let Some(home_dir) = dirs::home_dir() {
-            return home_dir.join(".config").join("hermes-pair").join("config.json");
+            return home_dir
+                .join(".config")
+                .join("hermes-pair")
+                .join("config.json");
         }
         PathBuf::from("config.json")
     }
@@ -60,7 +65,9 @@ pub fn save_config_to_path(config: &AppConfig, path: &Path) -> Result<(), std::i
 
     let tmp_file_name = format!(
         "{}.tmp.{}",
-        path.file_name().and_then(|n| n.to_str()).unwrap_or("config"),
+        path.file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("config"),
         Uuid::new_v4()
     );
     let tmp_path = match path.parent() {
@@ -76,7 +83,7 @@ pub fn save_config_to_path(config: &AppConfig, path: &Path) -> Result<(), std::i
         let _ = fs::remove_file(path);
         if let Err(fallback_err) = fs::rename(&tmp_path, path) {
             let _ = fs::remove_file(&tmp_path);
-            return Err(fallback_err.into());
+            return Err(fallback_err);
         }
     }
 

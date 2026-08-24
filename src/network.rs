@@ -36,12 +36,12 @@ fn interface_priority(info: &NetworkInterfaceInfo) -> u32 {
     let is_ts = is_tailscale_ip(&info.ip);
 
     match (info.is_virtual, is_priv, is_ts) {
-        (false, true, _) => 100,      // Physical LAN (192.168.x.x, 10.x.x.x, 172.16-31.x.x)
-        (false, false, true) => 80,   // Tailscale / Overlay
-        (false, false, false) => 60,  // Other physical (e.g. public or custom)
-        (true, true, _) => 40,        // Virtual LAN (e.g. WSL, Hyper-V virtual switch)
-        (true, false, true) => 30,    // Virtual Tailscale
-        (true, false, false) => 20,   // Other virtual
+        (false, true, _) => 100, // Physical LAN (192.168.x.x, 10.x.x.x, 172.16-31.x.x)
+        (false, false, true) => 80, // Tailscale / Overlay
+        (false, false, false) => 60, // Other physical (e.g. public or custom)
+        (true, true, _) => 40,   // Virtual LAN (e.g. WSL, Hyper-V virtual switch)
+        (true, false, true) => 30, // Virtual Tailscale
+        (true, false, false) => 20, // Other virtual
     }
 }
 
