@@ -3,7 +3,9 @@ use crate::hermes::{HermesProbeClient, ProbeState};
 use crate::identity::{get_display_name, get_host_id};
 use crate::models::{NetworkInterfaceInfo, PairingPayloadV1};
 use crate::network::discover_network_interfaces;
-use crate::pairing::{create_pairing_payload, encode_pairing_uri};
+use crate::pairing::{
+    create_pairing_payload, encode_pairing_uri, MAX_TTL_SECONDS, MIN_TTL_SECONDS,
+};
 use crate::qr::render_egui_image;
 use eframe::egui::{self, Color32, RichText, TextureHandle, Vec2};
 use std::net::Ipv4Addr;
@@ -12,6 +14,8 @@ use std::time::{Duration, Instant};
 
 pub struct HermesPairApp {
     config: AppConfig,
+    hermes_url: Option<String>,
+    scheme: String,
     port: u16,
     ttl: u64,
     interfaces: Vec<NetworkInterfaceInfo>,
@@ -34,10 +38,14 @@ impl HermesPairApp {
     pub fn new(
         cc: &eframe::CreationContext<'_>,
         config: AppConfig,
+        hermes_url: Option<String>,
+        scheme: String,
         port: u16,
         explicit_interface: Option<String>,
         ttl: u64,
     ) -> Self {
+        let ttl = ttl.clamp(MIN_TTL_SECONDS, MAX_TTL_SECONDS);
+
         let mut interfaces = discover_network_interfaces().unwrap_or_default();
         if interfaces.is_empty() {
             interfaces.push(NetworkInterfaceInfo {
@@ -68,7 +76,7 @@ impl HermesPairApp {
             display_name,
             host_ip.to_string(),
             port,
-            "http".to_string(),
+            scheme.clone(),
             ttl,
         );
         let current_uri = encode_pairing_uri(&current_payload);
@@ -79,6 +87,8 @@ impl HermesPairApp {
 
         let mut app = Self {
             config,
+            hermes_url,
+            scheme,
             port,
             ttl,
             interfaces,
@@ -118,7 +128,7 @@ impl HermesPairApp {
             display_name,
             host_ip.to_string(),
             self.port,
-            "http".to_string(),
+            self.scheme.clone(),
             self.ttl,
         );
         self.current_uri = encode_pairing_uri(&self.current_payload);
@@ -139,6 +149,8 @@ impl HermesPairApp {
         }
 
         self.is_probing = true;
+        let hermes_url = self.hermes_url.clone();
+        let scheme = self.scheme.clone();
         let port = self.port;
         let lan_ip = self.selected_ip();
         let tx = self.probe_tx.clone();
@@ -151,7 +163,9 @@ impl HermesPairApp {
             if let Ok(rt) = rt {
                 rt.block_on(async {
                     let client = HermesProbeClient::new();
-                    let res = client.probe(port, Some(lan_ip)).await;
+                    let res = client
+                        .probe(hermes_url.as_deref(), &scheme, port, Some(lan_ip))
+                        .await;
                     let _ = tx.send(res);
                 });
             }
@@ -206,13 +220,22 @@ impl eframe::App for HermesPairApp {
                                 let ver = resp.version.as_deref().unwrap_or("unknown");
                                 ui.label(format!("v{}", ver));
                                 if resp.auth_required {
-                                    ui.colored_label(Color32::from_rgb(52, 152, 219), "[Auth: Required]");
+                                    ui.colored_label(
+                                        Color32::from_rgb(52, 152, 219),
+                                        "[Auth: Required]",
+                                    );
                                 } else {
-                                    ui.colored_label(Color32::from_rgb(230, 126, 34), "[Auth: None]");
+                                    ui.colored_label(
+                                        Color32::from_rgb(230, 126, 34),
+                                        "[Auth: None]",
+                                    );
                                 }
                             }
                             ProbeState::LoopbackOnly { .. } => {
-                                ui.colored_label(Color32::from_rgb(241, 196, 15), "● Loopback Only");
+                                ui.colored_label(
+                                    Color32::from_rgb(241, 196, 15),
+                                    "● Loopback Only",
+                                );
                             }
                             ProbeState::Offline(err) => {
                                 ui.colored_label(Color32::from_rgb(231, 76, 60), "● Offline");
@@ -229,7 +252,7 @@ impl eframe::App for HermesPairApp {
                 });
 
             // Warning Banners
-            if let ProbeState::LoopbackOnly { .. } = &self.probe_state {
+            if let ProbeState::LoopbackOnly { lan_error, .. } = &self.probe_state {
                 ui.add_space(2.0);
                 egui::Frame::NONE
                     .fill(Color32::from_rgb(60, 45, 10))
@@ -241,10 +264,11 @@ impl eframe::App for HermesPairApp {
                             ui.label(RichText::new("⚠️").size(16.0));
                             ui.label(
                                 RichText::new(format!(
-                                    "Hermes is currently only reachable from this computer (127.0.0.1).\n\
-                                     Start Hermes with LAN-accessible bind:\n\
+                                    "Hermes is bound to loopback only (127.0.0.1).\n\
+                                     LAN connection failed: {}\n\
+                                     Start Hermes with LAN access:\n\
                                      hermes serve --host 0.0.0.0 --port {}",
-                                    self.port
+                                    lan_error, self.port
                                 ))
                                 .size(11.5)
                                 .color(Color32::from_rgb(241, 196, 15)),
@@ -279,11 +303,12 @@ impl eframe::App for HermesPairApp {
             // Network Interface Selector
             ui.horizontal(|ui| {
                 ui.label("Network Interface:");
-                let current_label = if let Some(iface) = self.interfaces.get(self.selected_iface_index) {
-                    format!("{} ({})", iface.name, iface.ip)
-                } else {
-                    "None".to_string()
-                };
+                let current_label =
+                    if let Some(iface) = self.interfaces.get(self.selected_iface_index) {
+                        format!("{} ({})", iface.name, iface.ip)
+                    } else {
+                        "None".to_string()
+                    };
 
                 let prev_idx = self.selected_iface_index;
                 egui::ComboBox::from_id_salt("interface_select")
@@ -311,40 +336,86 @@ impl eframe::App for HermesPairApp {
             // Address display
             ui.horizontal(|ui| {
                 ui.label(RichText::new("Target Address:").strong());
-                ui.monospace(format!("http://{}:{}", self.selected_ip(), self.port));
+                ui.monospace(format!(
+                    "{}://{}:{}",
+                    self.scheme,
+                    self.selected_ip(),
+                    self.port
+                ));
             });
 
             ui.add_space(4.0);
 
-            // Center QR Code
+            // Center QR Code or Placeholder Card
             ui.vertical_centered(|ui| {
-                if let Some(ref texture) = self.qr_texture {
-                    ui.image((texture.id(), Vec2::new(260.0, 260.0)));
-                } else {
-                    ui.label("Failed to load QR code");
-                }
-
-                ui.add_space(6.0);
-
-                // Expiry timer
-                if is_expired {
-                    ui.label(
-                        RichText::new("⚠️ QR Code Expired")
-                            .color(Color32::from_rgb(231, 76, 60))
-                            .strong(),
-                    );
-                } else {
-                    let mins = remaining / 60;
-                    let secs = remaining % 60;
-                    ui.label(
-                        RichText::new(format!("Expires in {:02}:{:02}", mins, secs))
-                            .size(13.0)
-                            .color(Color32::LIGHT_GRAY),
-                    );
+                match &self.probe_state {
+                    ProbeState::Online(_) => {
+                        if is_expired {
+                            egui::Frame::group(ui.style())
+                                .inner_margin(32.0)
+                                .show(ui, |ui| {
+                                    ui.label(
+                                        RichText::new("⚠️ QR Code Expired")
+                                            .color(Color32::from_rgb(231, 76, 60))
+                                            .strong()
+                                            .size(16.0),
+                                    );
+                                    ui.add_space(8.0);
+                                    ui.label(
+                                        "Click [ 🔄 Regenerate QR ] below to create a fresh pairing code.",
+                                    );
+                                });
+                        } else if let Some(ref texture) = self.qr_texture {
+                            ui.image((texture.id(), Vec2::new(260.0, 260.0)));
+                            ui.add_space(6.0);
+                            let mins = remaining / 60;
+                            let secs = remaining % 60;
+                            ui.label(
+                                RichText::new(format!("Expires in {:02}:{:02}", mins, secs))
+                                    .size(13.0)
+                                    .color(Color32::LIGHT_GRAY),
+                            );
+                        } else {
+                            ui.label("Failed to render QR code");
+                        }
+                    }
+                    ProbeState::LoopbackOnly { .. } => {
+                        egui::Frame::group(ui.style())
+                            .inner_margin(32.0)
+                            .show(ui, |ui| {
+                                ui.colored_label(
+                                    Color32::from_rgb(241, 196, 15),
+                                    RichText::new("⚠️ Pairing QR Hidden").size(15.0).strong(),
+                                );
+                                ui.add_space(8.0);
+                                ui.label(
+                                    "Hermes is running locally on 127.0.0.1, but unreachable on this LAN interface.\n\
+                                     Start Hermes with --host 0.0.0.0 to enable network pairing.",
+                                );
+                            });
+                    }
+                    ProbeState::Offline(err) => {
+                        egui::Frame::group(ui.style())
+                            .inner_margin(32.0)
+                            .show(ui, |ui| {
+                                ui.colored_label(
+                                    Color32::from_rgb(231, 76, 60),
+                                    RichText::new("● Hermes Offline").size(15.0).strong(),
+                                );
+                                ui.add_space(8.0);
+                                ui.label(format!(
+                                    "Hermes is not responding on this endpoint ({}).\n\
+                                     Start Hermes Agent and click [ 🔄 Check ] to connect.",
+                                    err
+                                ));
+                            });
+                    }
                 }
             });
 
             ui.add_space(6.0);
+
+            let can_copy = self.probe_state.is_online() && !is_expired;
 
             // Action Buttons
             ui.horizontal(|ui| {
@@ -355,7 +426,10 @@ impl eframe::App for HermesPairApp {
                         self.trigger_probe();
                     }
 
-                    if cols[1].button("📋 Copy Link").clicked() {
+                    if cols[1]
+                        .add_enabled(can_copy, egui::Button::new("📋 Copy Link"))
+                        .clicked()
+                    {
                         ctx.copy_text(self.current_uri.clone());
                         self.copied_banner_timer = Some(Instant::now());
                     }
